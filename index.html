@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Scratch with CSS Masks</title>
+<style>
+
+  * {
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+  }
+  :root {
+    font-size: 5vmin;
+  }
+    body {
+      background-color: #f0f0f0;
+      color: #101010;
+      font-family: "Arial Black", "Avenir-Black";
+      -webkit-font-smoothing: antialiased;
+      overflow-y: scroll;
+      -webkit-tap-highlight-color: transparent;
+      -moz-user-select: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+      article {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+        h1 {
+          font-size: 2.0rem;
+          line-height: 1.375;
+          margin: 0 1.0rem 2.0rem;
+          text-align: center;
+        }
+          h1 b {
+            color: #f00000;
+          }
+
+        /* 💬 結果 */
+        .result1 {
+          color: #f00000;
+          font-size: 1.75rem;
+          margin-bottom: 5vmin;
+          padding: 1.0rem 1.5rem;
+          position: relative;
+        }
+        .result2 {
+          font-size: 1.5rem;
+          padding: 1.0rem 1.5rem;
+          position: relative;
+          text-align: center;
+        }
+          .result2 small {
+            display: block;
+            margin-bottom: 1vmin;
+          }
+
+          /* 💬 カバー ※結果要素の中に入れると良い */
+          .cover {
+            background-image: linear-gradient(to bottom, #c0c0c0, #909090);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-mask-position: center;
+            -webkit-mask-repeat: no-repeat;
+            cursor: pointer;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+          }
+            .cover__label {
+              color: #f0f0f0;
+              font-size: 1.0rem;
+              line-height: 1.375;
+              padding: 2.0rem;
+            }
+
+</style>
+<article>
+  <h1><b>Scratch</b> with CSS Masks</h1>
+  <div class="result1">
+    🎉 You won! 🎉
+    <div class="cover">
+      <div class="cover__label">Scratch me!</div>
+    </div>
+  </div>
+  <div class="result2">
+    <small>Coupon Code</small>123-456-789
+    <div class="cover">
+      <div class="cover__label">Scratch me!</div>
+    </div>
+  </div>
+</article>
+<script>
+
+  class Scratch {
+
+    constructor (params) {
+      this.setupParams(params)
+      this.setupCover()
+      this.setupCanvas()
+      this.setupContext()
+      this.setupListeners()
+      this.applyMask()
+      this.previousTime = 0
+    }
+
+    setupParams (params) {
+      this.params = Object.assign({}, params)
+      this.params.lineWidth = params.lineWidth || 16
+      this.params.throttleInterval = params.throttleInterval || 25
+    }
+
+    setupCover () {
+      this.cover = document.querySelector(this.params.coverSelector)
+    }
+
+    setupCanvas () {
+      this.canvas = document.createElement('canvas')
+
+      // 💬 canvas サイズがカバーサイズと完全に同じだと隙間が生じるため `+ 2` している
+      // ❗ カバーサイズがウィンドウのリサイズなどによって伸縮するケースにも対応したい
+      //    ただし canvas のリサイズによって描画内容が消去される点にも留意すること
+      this.canvas.setAttribute('width', this.cover.clientWidth + 2)
+      this.canvas.setAttribute('height', this.cover.clientHeight + 2)
+
+    }
+
+    setupContext () {
+      this.context = this.canvas.getContext('2d')
+      this.context.fillStyle = '#000000'
+      this.context.fillRect(0, 0, this.canvas.width, this.canvas.height)
+
+      // 💬 ミソ
+      this.context.globalCompositeOperation = 'destination-out'
+
+      this.context.lineCap = 'round'
+      this.context.lineJoin= 'round'
+      this.context.lineWidth = this.params.lineWidth
+      this.context.strokeStyle = '#ffffff'
+    }
+
+    setupListeners () {
+
+      // 💬 Pointer API は Safari が未対応のため使用しない
+      const inputEvents = {
+        start: 'ontouchstart' in window ? 'touchstart' : 'mousedown',
+        move: 'ontouchmove' in window ? 'touchmove' : 'mousemove',
+        end: 'ontouchend' in window ? 'touchend' : 'mouseup'
+      }
+      let isInputDown = false
+      window.addEventListener(inputEvents.start, (event) => {
+        const position = this.getInputPosition(event)
+        isInputDown = true
+        this.context.beginPath()
+        this.context.moveTo(position.x, position.y)
+        this.params.previousTime = 0
+      })
+      window.addEventListener(inputEvents.move, (event) => {
+        if (isInputDown) {
+          const position = this.getInputPosition(event)
+          this.context.lineTo(position.x, position.y)
+          this.context.stroke()
+
+          // 💬 マスクの更新タイミングを間引く（あまり意味はない）
+          this.throttleExecution(this.applyMask.bind(this))
+
+        }
+      })
+      window.addEventListener(inputEvents.end, () => {
+        isInputDown = false
+        this.applyMask()
+      })
+
+      // 💬 スマートフォンではカバー上でのスクロールをロック
+      this.cover.addEventListener('touchstart', (event) => {
+        event.preventDefault()
+      })
+
+    }
+
+    getInputPosition (event) {
+      const coverPosition = this.cover.getBoundingClientRect()
+      event = (event.touches && event.touches[0]) || event
+      return {
+        x: event.clientX - coverPosition.x,
+        y: event.clientY - coverPosition.y
+      }
+    }
+
+    throttleExecution (callback) {
+      const currentTime = Date.now()
+      if (currentTime - this.previousTime > this.params.throttleInterval) {
+        this.previousTime = currentTime
+        callback()
+      }
+    }
+
+    applyMask () {
+
+      // ❗ 将来的にプリフィクスなしにも対応したい
+      this.cover.style['-webkit-mask-image'] = `url(${this.canvas.toDataURL()})`
+
+    }
+
+  }
+
+</script>
+<script>
+
+  new Scratch({
+    coverSelector: '.result1 .cover',
+    lineWidth: 16,
+    throttleInterval: 25
+  })
+  new Scratch({
+    coverSelector: '.result2 .cover',
+    lineWidth: 16,
+    throttleInterval: 25
+  })
+
+</script>
+
+</body>
+</html>
